@@ -11,3 +11,22 @@ The `run.py` script in this repository allows connection to the inverter and rea
 Additionally, `dashboard/app.py` offers a simple Streamlit dashboard for displaying these values.
 
 Set up on a Raspberry Pi, this configuration enables easy access to the inverter's metrics from any browser on a mobile or desktop device, anytime and anywhere.
+
+To connect from the RJ45 to the Raspberry Pi, I used an old ethernet cabe, cut off one end and attached the 2 wires at Pin 1 and 2 to a serial-to-usb-adapter. I used this **URL to USB-Adapter** Adpater which can be ordered at only xxxPHP plus shipping.
+
+![Schematics of the RJ45-Port](img/schematics.jpg)
+
+![Serial to USB Adapter](img/adapter.jpg)
+
+![Inverter and Raspberry Pi setup](img/inverter.jpg)
+
+
+**Pic of dashboard**
+
+## Todo:
+
+* Setup raspberry and run everything
+* make photos: cable, adapter, raspi, inverter, dashboard
+* Create daily metrics in dashboard
+* Write about the Adapter and cable
+* Write on how to setup raspberry

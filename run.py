@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import os, random
+import os
 from datetime import datetime
 from time import sleep
 import pandas as pd
 import minimalmodbus
 
 
-SERIAL_PORT = '/dev/cu.usbserial-110'
+SERIAL_PORT = '/dev/ttyUSB0'
 
 # Function to read input registers
 def read_input_registers(instrument, start_address, count):
@@ -30,7 +30,6 @@ instrument.serial.bytesize = 8
 instrument.serial.parity = minimalmodbus.serial.PARITY_NONE
 instrument.serial.stopbits = 1
 instrument.serial.timeout = 1  # seconds
-instrument = None
 
 while True:
     filepath = os.path.join('data', f'results_{datetime.now().date()}.csv')
