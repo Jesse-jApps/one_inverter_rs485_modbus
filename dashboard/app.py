@@ -25,7 +25,7 @@ RESPONSE_MAPPING = {
     14: {'id': 14, 'name': 'Ambient temperature', 'unit': '°C'},
     15: {'id': 15, 'name': 'PV input voltage', 'unit': 'V', 'is_decimal':True},
     17: {'id': 17, 'name': 'Controller battery', 'unit': 'V', 'is_decimal':True},
-    18: {'id': 18, 'name': 'Controller charging', 'unit': 'A'},
+    18: {'id': 18, 'name': 'Controller charging', 'unit': 'A', 'is_decimal':True},
     20: {'id': 20, 'name': 'Controller internal', 'unit': '°C'},
     21: {'id': 21, 'name': 'Controller internal', 'unit': '°C'},
     22: {'id': 22, 'name': 'Controller external', 'unit': '°C'},
@@ -59,7 +59,7 @@ while True:
     battery_capacity_rate = df_today['9'].iloc[-1]
     battery_voltage = round(df_today['7'].iloc[-1]/10, 1)
 
-    input_current = df_today['18'].iloc[-1]
+    input_current = round(df_today['18'].iloc[-1]/10, 1)
     input_voltage = round(df_today['15'].iloc[-1]/10, 1)
 
     current_power = round(input_current*input_voltage)

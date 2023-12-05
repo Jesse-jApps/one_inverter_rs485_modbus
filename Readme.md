@@ -30,3 +30,5 @@ To connect from the RJ45 to the Raspberry Pi, I used an old ethernet cabe, cut o
 * Create daily metrics in dashboard
 * Write about the Adapter and cable
 * Write on how to setup raspberry
+
+
