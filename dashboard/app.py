@@ -79,15 +79,6 @@ st.set_page_config(
     layout="wide",
 )
 
-st.markdown('## Live Metrics')
-placeholder = st.empty()
-
-st.markdown('## Daily Metrics')
-placeholder_daily = st.empty()
-
-st.markdown('## Battery breakdown')
-placeholder_battery = st.empty()
-
 dfs = []
 for f in glob.glob(os.path.join(DATA_FOLDERPATH, '*.csv')):
     if '.csv' not in f:
@@ -102,6 +93,65 @@ df_all = prepare_df(pd.concat(dfs))
 df_all_max = df_all.groupby('date', as_index=False).max()
 df_minute = prepare_df_minute(df_all)
 
+st.markdown('## Live Metrics')
+placeholder = st.empty()
+
+st.markdown('## Daily Metrics')
+c1, c2, c3 = st.columns(3)
+
+chart_total_production = alt.Chart(df_all_max).mark_bar().encode(
+    x = alt.X("date", title='Date'),
+    y=alt.Y("24", title='Total Electricity Production in Wh'),
+)
+c1.altair_chart(chart_total_production, use_container_width=True)
+
+chart_production = alt.Chart(df_all[df_all['power'] != 0]).mark_boxplot(extent="min-max").encode(
+    x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
+    y=alt.Y("power:Q", title='Electricity Production in W'),
+    color=alt.Color("date:O", legend=None)
+)
+c2.altair_chart(chart_production, use_container_width=True)
+
+chart_load = alt.Chart(df_all).mark_boxplot(extent="min-max").encode(
+    x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
+    y=alt.Y("6:Q", title='Load in %'),
+    color=alt.Color("date:O", legend=None)
+)
+c3.altair_chart(chart_load, use_container_width=True)
+
+st.markdown('## Battery breakdown')
+b1, b2, b3 = st.columns(3)
+chart_voltage_time = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
+    x=alt.X('x', axis=alt.Axis(
+        labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
+    )),
+    y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
+    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+)
+
+b1.altair_chart(alt.layer(chart_voltage_time), use_container_width=True)
+
+chart_load_time = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
+    x=alt.X('x', axis=alt.Axis(
+        labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
+    )),
+    y=alt.Y('load', scale=alt.Scale(zero=False)),
+    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+)
+
+b2.altair_chart(chart_load_time, use_container_width=True)
+
+
+chart_voltage_load = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
+    x='load:Q',
+    y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
+    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+)
+
+b3.altair_chart(chart_voltage_load, use_container_width=True)
+
+
+
 daily_refresh = 0
 while True:
     today_filepath = os.path.join(DATA_FOLDERPATH, f'results_{datetime.now().date()}.csv')
@@ -109,13 +159,12 @@ while True:
     df_today = pd.read_csv(today_filepath)
     df_today['filepath'] = today_filepath
 
-    if daily_refresh == 10:
-        df_all = df_all[df_all['filepath'] != today_filepath]
-        df_all = prepare_df(pd.concat([df_all, df_today]))
-        df_all_max = df_all.groupby('date', as_index=False).max()
-
-        df_minute = prepare_df_minute(df_all)
-        daily_refresh = 0
+    #if daily_refresh == 10:
+    #    df_all = df_all[df_all['filepath'] != today_filepath]
+    #    df_all = prepare_df(pd.concat([df_all, df_today]))
+    #    df_all_max = df_all.groupby('date', as_index=False).max()
+    #    df_minute = prepare_df_minute(df_all)
+    #    daily_refresh = 0
 
 
     output_load_rate = df_today['6'].iloc[-1]
@@ -170,62 +219,7 @@ while True:
             value=f'{round(production_today/1000, 1)} kWh',
             delta=f'{production_today_delta} %'
         )
-
-    with placeholder_daily.container():
-        c1, c2, c3 = st.columns(3)
-
-        chart_total_production = alt.Chart(df_all_max).mark_bar().encode(
-            x = alt.X("date", title='Date'),
-            y=alt.Y("24", title='Total Electricity Production in Wh'),
-        )
-        c1.altair_chart(chart_total_production, use_container_width=True)
-
-        chart_production = alt.Chart(df_all[df_all['power'] != 0]).mark_boxplot(extent="min-max").encode(
-            x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
-            y=alt.Y("power:Q", title='Electricity Production in W'),
-            color=alt.Color("date:O", legend=None)
-        )
-        c2.altair_chart(chart_production, use_container_width=True)
-
-        chart_load = alt.Chart(df_all).mark_boxplot(extent="min-max").encode(
-            x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
-            y=alt.Y("6:Q", title='Load in %'),
-            color=alt.Color("date:O", legend=None)
-        )
-        c3.altair_chart(chart_load, use_container_width=True)
-
-    with placeholder_battery.container():
-        b1, b2, b3 = st.columns(3)
-        chart_voltage_time = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
-            x=alt.X('x', axis=alt.Axis(
-                labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
-            )),
-            y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
-            color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
-        )
-
-        b1.altair_chart(alt.layer(chart_voltage_time), use_container_width=True)
-
-        chart_load_time = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
-            x=alt.X('x', axis=alt.Axis(
-                labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
-            )),
-            y=alt.Y('load', scale=alt.Scale(zero=False)),
-            color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
-        )
-
-        b2.altair_chart(chart_load_time, use_container_width=True)
-
-
-        chart_voltage_load = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
-            x='load:Q',
-            y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
-            color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
-        )
-
-        b3.altair_chart(chart_voltage_load, use_container_width=True)
-
-
+    continue
 
     time.sleep(2)
     daily_refresh += 1
