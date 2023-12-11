@@ -109,3 +109,5 @@ tmp/
 **/logs/
 
 data/
+
+process_id.txt

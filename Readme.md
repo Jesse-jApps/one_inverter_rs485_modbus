@@ -20,15 +20,7 @@ To connect from the RJ45 to the Raspberry Pi, I used an old ethernet cabe, cut o
 
 ![Inverter and Raspberry Pi setup](img/inverter.jpg)
 
+![Dashboard Desktop](img/desktop.png)
 
-**Pic of dashboard**
-
-## Todo:
-
-* Setup raspberry and run everything
-* make photos: cable, adapter, raspi, inverter, dashboard
-* Create daily metrics in dashboard
-* Write about the Adapter and cable
-* Write on how to setup raspberry
-
+![Dashboard Mobile](img/mobile.png)
 
