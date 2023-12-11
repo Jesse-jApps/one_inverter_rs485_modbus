@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import time, os
-from datetime import datetime
+import time, os, pytz, glob
+from datetime import datetime, timedelta
 
 import pandas as pd 
 import streamlit as st
+import altair as alt
+
+from scipy.signal import savgol_filter 
 
 
 APP_FOLDERPATH = os.path.dirname(os.path.abspath(__file__))
@@ -36,22 +39,84 @@ RESPONSE_MAPPING = {
     27: {'id': 27, 'name': 'Timestamp', 'unit': 'ms'},
 }
 
+def prepare_df(df):
+    df['datetime'] = df['27'].map(lambda x: datetime.fromtimestamp(x, pytz.timezone("Asia/Manila")))
+    df['date'] = df['datetime'].map(lambda x: x.date())
+    df['hour'] = df['datetime'].map(lambda x: x.hour)
+    df['battery_voltage'] = df['7'].map(lambda x: round(x/10, 1))
+    df['time'] = df['datetime'].map(lambda x: x.strftime('%H:%M'))
+    df['power'] = (df['18'] * df['15']).map(lambda x: round(x/100, 1))
+
+    return df
+
+def prepare_df_minute(df):
+    df_minute = df.groupby(['date', 'time'], as_index=False).mean(numeric_only=True)
+    df_minute['datetime'] = df_minute.apply(
+        lambda x: datetime.strptime(f"{x['date']} {x['time']}", '%Y-%m-%d %H:%M'),
+        axis=1
+    )
+    df_minute['x'] = df_minute['datetime'].map(
+        lambda x: (x.hour-17)*60+x.minute if x.hour >= 17 else (x.hour+7)*60+x.minute
+    )
+    df_minute['night'] = df_minute.apply(
+        lambda x: f"{x['date']} - {x['date']+timedelta(days=1)}" if x['hour'] >= 17 else f"{x['date']-timedelta(days=1)} - {x['date']}" ,
+        axis=1
+    )
+    df_minute = df_minute.sort_values('x')
+
+    dfs = []
+    for i, df_sub in df_minute.groupby('night'):
+        df_sub['load'] = df_sub['4'].cumsum()
+        df_sub['battery_voltage_smooth'] = df_sub[['battery_voltage']].apply(savgol_filter,  window_length=60, polyorder=2)
+        dfs.append(df_sub)
+    df_minute = pd.concat(dfs)
+    df_minute = df_minute[df_minute['night'] > df_minute['night'].min()]
+
+    return df_minute
+
 st.set_page_config(
     page_title="Inverter Live and Historical Data",
     layout="wide",
 )
 
 st.markdown('## Live Metrics')
-
 placeholder = st.empty()
 
 st.markdown('## Daily Metrics')
+placeholder_daily = st.empty()
 
+st.markdown('## Battery breakdown')
+placeholder_battery = st.empty()
 
+dfs = []
+for f in glob.glob(os.path.join(DATA_FOLDERPATH, '*.csv')):
+    if '.csv' not in f:
+        continue
+    file_date = datetime.strptime(f.split('/')[-1], 'results_%Y-%m-%d.csv')
+    if file_date < datetime.now()-timedelta(days=6):
+        continue
+    df = pd.read_csv(f)
+    df['filepath'] = f
+    dfs.append(df)
+df_all = prepare_df(pd.concat(dfs))
+df_all_max = df_all.groupby('date', as_index=False).max()
+df_minute = prepare_df_minute(df_all)
+
+daily_refresh = 0
 while True:
     today_filepath = os.path.join(DATA_FOLDERPATH, f'results_{datetime.now().date()}.csv')
 
     df_today = pd.read_csv(today_filepath)
+    df_today['filepath'] = today_filepath
+
+    if daily_refresh == 10:
+        df_all = df_all[df_all['filepath'] != today_filepath]
+        df_all = prepare_df(pd.concat([df_all, df_today]))
+        df_all_max = df_all.groupby('date', as_index=False).max()
+
+        df_minute = prepare_df_minute(df_all)
+        daily_refresh = 0
+
 
     output_load_rate = df_today['6'].iloc[-1]
     output_current = df_today['4'].iloc[-1]
@@ -62,14 +127,20 @@ while True:
     input_current = round(df_today['18'].iloc[-1]/10, 1)
     input_voltage = round(df_today['15'].iloc[-1]/10, 1)
 
+    production_today = df_today['24'].max()
+    production_daily_mean = df_all_max['24'].mean()
+    production_today_delta = round((production_today - production_daily_mean) / production_daily_mean * 100)
+
     current_power = round(input_current*input_voltage)
-    previous_mean_power = (df_today.tail(20)['18'] * df_today.tail(20)['15'].map(lambda x: round(x/10, 1))).mean()
+    previous_mean_power = (df_today.tail(20)['18'].map(lambda x: round(x/10, 1)) * df_today.tail(20)['15'].map(lambda x: round(x/10, 1))).mean()
     current_power_delta = 100
     if previous_mean_power != 0:
         current_power_delta = round((current_power - previous_mean_power) / previous_mean_power * 100)
+    if previous_mean_power == 0 and current_power == 0:
+        current_power_delta = 0
 
     with placeholder.container():
-        kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+        kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 
         kpi1.metric(
             label="Current Load",
@@ -94,6 +165,69 @@ while True:
             value=f'{current_power} W',
             delta=f'{current_power_delta} %'
         )
-        time.sleep(2)
+        kpi5.metric(
+            label="Production today",
+            value=f'{round(production_today/1000, 1)} kWh',
+            delta=f'{production_today_delta} %'
+        )
+
+    with placeholder_daily.container():
+        c1, c2, c3 = st.columns(3)
+
+        chart_total_production = alt.Chart(df_all_max).mark_bar().encode(
+            x = alt.X("date", title='Date'),
+            y=alt.Y("24", title='Total Electricity Production in Wh'),
+        )
+        c1.altair_chart(chart_total_production, use_container_width=True)
+
+        chart_production = alt.Chart(df_all[df_all['power'] != 0]).mark_boxplot(extent="min-max").encode(
+            x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
+            y=alt.Y("power:Q", title='Electricity Production in W'),
+            color=alt.Color("date:O", legend=None)
+        )
+        c2.altair_chart(chart_production, use_container_width=True)
+
+        chart_load = alt.Chart(df_all).mark_boxplot(extent="min-max").encode(
+            x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
+            y=alt.Y("6:Q", title='Load in %'),
+            color=alt.Color("date:O", legend=None)
+        )
+        c3.altair_chart(chart_load, use_container_width=True)
+
+    with placeholder_battery.container():
+        b1, b2, b3 = st.columns(3)
+        chart_voltage_time = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
+            x=alt.X('x', axis=alt.Axis(
+                labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
+            )),
+            y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
+            color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+        )
+
+        b1.altair_chart(alt.layer(chart_voltage_time), use_container_width=True)
+
+        chart_load_time = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
+            x=alt.X('x', axis=alt.Axis(
+                labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
+            )),
+            y=alt.Y('load', scale=alt.Scale(zero=False)),
+            color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+        )
+
+        b2.altair_chart(chart_load_time, use_container_width=True)
+
+
+        chart_voltage_load = alt.Chart(df_minute[df_minute['power'] == 0]).mark_line().encode(
+            x='load:Q',
+            y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
+            color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+        )
+
+        b3.altair_chart(chart_voltage_load, use_container_width=True)
+
+
+
+    time.sleep(2)
+    daily_refresh += 1
 
 
