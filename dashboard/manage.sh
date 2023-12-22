@@ -3,7 +3,8 @@
 function start_app() {
 
     # tested with this , uncomment your command
-    streamlit run app.py --browser.gatherUsageStats False > app.log  2>&1 & 
+    source /home/pi/inverter_env/bin/activate
+    streamlit run /home/pi/one_inverter_rs485_modbus/dashboard/app.py --browser.gatherUsageStats False > app.log  2>&1 &
     # write the pid to text to file to use it later
     app_pid=$!
     echo "Process started having PID $app_pid"

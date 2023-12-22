@@ -9,6 +9,9 @@ import minimalmodbus
 
 SERIAL_PORT = '/dev/ttyUSB0'
 
+BASE_FOLDERPATH = os.path.dirname(os.path.abspath(__file__))
+DATA_FOLDERPATH = os.path.join(BASE_FOLDERPATH, 'data')
+
 # Function to read input registers
 def read_input_registers(instrument, start_address, count):
     try:
@@ -32,7 +35,7 @@ instrument.serial.stopbits = 1
 instrument.serial.timeout = 1  # seconds
 
 while True:
-    filepath = os.path.join('data', f'results_{datetime.now().date()}.csv')
+    filepath = os.path.join(DATA_FOLDERPATH, f'results_{datetime.now().date()}.csv')
     result = read_input_registers(instrument, 0, 27)
     if result is not None:
         result.append(datetime.now().timestamp())
