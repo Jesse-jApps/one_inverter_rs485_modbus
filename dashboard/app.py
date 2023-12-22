@@ -66,6 +66,8 @@ def prepare_df_minute(df):
 
     dfs = []
     for i, df_sub in df_minute.groupby('night'):
+        if df_sub.shape[0] < 60:
+            continue
         df_sub['load'] = df_sub['4'].cumsum()
         df_sub['battery_voltage_smooth'] = df_sub[['battery_voltage']].apply(savgol_filter,  window_length=60, polyorder=2)
         dfs.append(df_sub)
