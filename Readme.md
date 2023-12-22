@@ -27,7 +27,3 @@ To connect from the RJ45 to the Raspberry Pi, I used an old ethernet cabe, cut o
 
 
 
-
-## Todod
-
-How to determine battery capacity with given settings (charge voltage and shutdown volatge)

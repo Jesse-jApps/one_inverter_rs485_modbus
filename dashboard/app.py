@@ -40,9 +40,6 @@ RESPONSE_MAPPING = {
 }
 
 def prepare_df(df):
-    df['datetime'] = df['27'].map(lambda x: datetime.fromtimestamp(x, pytz.timezone("Asia/Manila")))
-    df['date'] = df['datetime'].map(lambda x: x.date())
-    df['hour'] = df['datetime'].map(lambda x: x.hour)
     df['battery_voltage'] = df['7'].map(lambda x: round(x/10, 1))
     df['time'] = df['datetime'].map(lambda x: x.strftime('%H:%M'))
     df['power'] = (df['18'] * df['15']).map(lambda x: round(x/100, 1))
@@ -90,23 +87,63 @@ for f in glob.glob(os.path.join(DATA_FOLDERPATH, '*.csv')):
         continue
     df = pd.read_csv(f)
     df['filepath'] = f
+    df['datetime'] = df['27'].map(lambda x: datetime.fromtimestamp(x, pytz.timezone("Asia/Manila")))
+    df['date'] = df['datetime'].map(lambda x: x.date())
+    df['hour'] = df['datetime'].map(lambda x: x.hour)
+    df['seconds'] = df['datetime'].map(lambda x: (x - x.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds())
+    df['Wh'] = df['4']*(df['seconds'] - df['seconds'].shift(1)).fillna(df['seconds'])/3600*220
+    #df['Wh_cumsum'] = df['Wh'].cumsum()
     dfs.append(df)
 df_all = prepare_df(pd.concat(dfs))
+df_all['x'] = df_all['datetime'].map(
+    lambda x: (x.hour-17)*60+x.minute if x.hour >= 17 else (x.hour+7)*60+x.minute
+)
+df_all['night'] = df_all.apply(
+    lambda x: f"{x['date']} - {x['date']+timedelta(days=1)}" if x['hour'] >= 17 else f"{x['date']-timedelta(days=1)} - {x['date']}" ,
+    axis=1
+)
 df_all_max = df_all.groupby('date', as_index=False).max()
-df_minute = prepare_df_minute(df_all)
-df_minute = df_minute[df_minute['power'] == 0]
+#df_minute = prepare_df_minute(df_all)
+#df_minute = df_minute[df_minute['power'] == 0]
 
 st.markdown('## Live Metrics')
 placeholder = st.empty()
 
-st.markdown('## Daily Metrics')
-c1, c2, c3 = st.columns(3)
+st.markdown('## Battery infos')
+c1, c2 = st.columns(2)
+c1.markdown('### Total consumption during night')
+df_sonsumption_night = df_all[df_all['power'] == 0].groupby('night')[['Wh']].sum()
+df_sonsumption_night['kWh'] = df_sonsumption_night['Wh'].map(lambda x: round(x/1000, 2))
+c1.dataframe(df_sonsumption_night[['kWh']])
 
-chart_total_production = alt.Chart(df_all_max).mark_bar().encode(
-    x = alt.X("date", title='Date'),
-    y=alt.Y("24", title='Total Electricity Production in Wh'),
-)
-c1.altair_chart(chart_total_production, use_container_width=True)
+#c1, c2, c3, c4 = st.columns(4)
+#for d, df_sub in df_all[df_all['power'] == 0].groupby('date'):
+#chart = alt.Chart(df_all[df_all['power'] == 0]).mark_line().transform_window(
+#    # Sort the data chronologically
+#    sort=[{'field': 'x'}],
+#    # Include all previous records before the current record and none after
+#    # (This is the default value so you could skip it and it would still work.)
+#    frame=[None, 0],
+#    # What to add up as you go
+#    cumulative_wh='sum(Wh)',
+#    groupby=['night'],
+#).encode(
+#    x='x',
+#    y=alt.Y('cumulative_wh:Q'),
+#    color=alt.Color("night:O")
+#)
+
+#st.altair_chart(chart, use_container_width=True)
+
+#
+#st.markdown('## Daily Metrics')
+#c1, c2, c3 = st.columns(3)
+#
+#chart_total_production = alt.Chart(df_all_max).mark_bar().encode(
+#    x = alt.X("date", title='Date'),
+#    y=alt.Y("24", title='Total Electricity Production in Wh'),
+#)
+#c1.altair_chart(chart_total_production, use_container_width=True)
 
 #chart_production = alt.Chart(df_all[df_all['power'] != 0]).mark_boxplot(extent="min-max").encode(
 #    x=alt.X("date:T", axis=alt.Axis(tickCount="day"), title='Date'),
@@ -122,36 +159,36 @@ c1.altair_chart(chart_total_production, use_container_width=True)
 #)
 #c3.altair_chart(chart_load, use_container_width=True)
 
-st.markdown('## Battery breakdown')
-b1, b2, b3 = st.columns(3)
-chart_voltage_time = alt.Chart(df_minute).mark_line().encode(
-    x=alt.X('x', axis=alt.Axis(
-        labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
-    )),
-    y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
-    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
-)
-
-b1.altair_chart(alt.layer(chart_voltage_time), use_container_width=True)
-
-chart_load_time = alt.Chart(df_minute).mark_line().encode(
-    x=alt.X('x', axis=alt.Axis(
-        labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
-    )),
-    y=alt.Y('load', scale=alt.Scale(zero=False)),
-    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
-)
-
-b2.altair_chart(chart_load_time, use_container_width=True)
-
-
-chart_voltage_load = alt.Chart(df_minute).mark_line().encode(
-    x='load:Q',
-    y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
-    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
-)
-
-b3.altair_chart(chart_voltage_load, use_container_width=True)
+#st.markdown('## Battery breakdown')
+#b1, b2, b3 = st.columns(3)
+#chart_voltage_time = alt.Chart(df_minute).mark_line().encode(
+#    x=alt.X('x', axis=alt.Axis(
+#        labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
+#    )),
+#    y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
+#    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+#)
+#
+#b1.altair_chart(alt.layer(chart_voltage_time), use_container_width=True)
+#
+#chart_load_time = alt.Chart(df_minute).mark_line().encode(
+#    x=alt.X('x', axis=alt.Axis(
+#        labelExpr="format((datum.value/60+17 <= 24) ? round(datum.value/60 + 17) : round(datum.value/60 - 6), '~s')+':00'"
+#    )),
+#    y=alt.Y('load', scale=alt.Scale(zero=False)),
+#    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+#)
+#
+#b2.altair_chart(chart_load_time, use_container_width=True)
+#
+#
+#chart_voltage_load = alt.Chart(df_minute).mark_line().encode(
+#    x='load:Q',
+#    y=alt.Y('battery_voltage_smooth', scale=alt.Scale(zero=False)),
+#    color=alt.Color("night:O", scale=alt.Scale(scheme='dark2'))
+#)
+#
+#b3.altair_chart(chart_voltage_load, use_container_width=True)
 
 
 
