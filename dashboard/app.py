@@ -78,43 +78,43 @@ st.set_page_config(
     layout="wide",
 )
 
-dfs = []
-for f in glob.glob(os.path.join(DATA_FOLDERPATH, '*.csv')):
-    if '.csv' not in f:
-        continue
-    file_date = datetime.strptime(f.split('/')[-1], 'results_%Y-%m-%d.csv')
-    if file_date < datetime.now()-timedelta(days=6):
-        continue
-    df = pd.read_csv(f)
-    df['filepath'] = f
-    df['datetime'] = df['27'].map(lambda x: datetime.fromtimestamp(x, pytz.timezone("Asia/Manila")))
-    df['date'] = df['datetime'].map(lambda x: x.date())
-    df['hour'] = df['datetime'].map(lambda x: x.hour)
-    df['seconds'] = df['datetime'].map(lambda x: (x - x.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds())
-    df['Wh'] = df['4']*(df['seconds'] - df['seconds'].shift(1)).fillna(df['seconds'])/3600*220
-    #df['Wh_cumsum'] = df['Wh'].cumsum()
-    dfs.append(df)
-df_all = prepare_df(pd.concat(dfs))
-df_all['x'] = df_all['datetime'].map(
-    lambda x: (x.hour-17)*60+x.minute if x.hour >= 17 else (x.hour+7)*60+x.minute
-)
-df_all['night'] = df_all.apply(
-    lambda x: f"{x['date']} - {x['date']+timedelta(days=1)}" if x['hour'] >= 17 else f"{x['date']-timedelta(days=1)} - {x['date']}" ,
-    axis=1
-)
-df_all_max = df_all.groupby('date', as_index=False).max()
+#dfs = []
+#for f in glob.glob(os.path.join(DATA_FOLDERPATH, '*.csv')):
+#    if '.csv' not in f:
+#        continue
+#    file_date = datetime.strptime(f.split('/')[-1], 'results_%Y-%m-%d.csv')
+#    if file_date < datetime.now()-timedelta(days=6):
+#        continue
+#    df = pd.read_csv(f)
+#    df['filepath'] = f
+#    df['datetime'] = df['27'].map(lambda x: datetime.fromtimestamp(x, pytz.timezone("Asia/Manila")))
+#    df['date'] = df['datetime'].map(lambda x: x.date())
+#    df['hour'] = df['datetime'].map(lambda x: x.hour)
+#    df['seconds'] = df['datetime'].map(lambda x: (x - x.replace(hour=0, minute=0, second=0, microsecond=0)).total_seconds())
+#    df['Wh'] = df['4']*(df['seconds'] - df['seconds'].shift(1)).fillna(df['seconds'])/3600*220
+#    #df['Wh_cumsum'] = df['Wh'].cumsum()
+#    dfs.append(df)
+#df_all = prepare_df(pd.concat(dfs))
+#df_all['x'] = df_all['datetime'].map(
+#    lambda x: (x.hour-17)*60+x.minute if x.hour >= 17 else (x.hour+7)*60+x.minute
+#)
+#df_all['night'] = df_all.apply(
+#    lambda x: f"{x['date']} - {x['date']+timedelta(days=1)}" if x['hour'] >= 17 else f"{x['date']-timedelta(days=1)} - {x['date']}" ,
+#    axis=1
+#)
+#df_all_max = df_all.groupby('date', as_index=False).max()
 #df_minute = prepare_df_minute(df_all)
 #df_minute = df_minute[df_minute['power'] == 0]
 
 st.markdown('## Live Metrics')
 placeholder = st.empty()
 
-st.markdown('## Battery infos')
-c1, c2 = st.columns(2)
-c1.markdown('### Total consumption during night')
-df_sonsumption_night = df_all[df_all['power'] == 0].groupby('night')[['Wh']].sum()
-df_sonsumption_night['kWh'] = df_sonsumption_night['Wh'].map(lambda x: round(x/1000, 2))
-c1.dataframe(df_sonsumption_night[['kWh']])
+#st.markdown('## Battery infos')
+#c1, c2 = st.columns(2)
+#c1.markdown('### Total consumption during night')
+#df_sonsumption_night = df_all[df_all['power'] == 0].groupby('night')[['Wh']].sum()
+#df_sonsumption_night['kWh'] = df_sonsumption_night['Wh'].map(lambda x: round(x/1000, 2))
+#c1.dataframe(df_sonsumption_night[['kWh']])
 
 #c1, c2, c3, c4 = st.columns(4)
 #for d, df_sub in df_all[df_all['power'] == 0].groupby('date'):
@@ -217,8 +217,8 @@ while True:
     input_voltage = round(df_today['15'].iloc[-1]/10, 1)
 
     production_today = df_today['24'].max()
-    production_daily_mean = df_all_max['24'].mean()
-    production_today_delta = round((production_today - production_daily_mean) / production_daily_mean * 100)
+    #production_daily_mean = df_all_max['24'].mean()
+    #production_today_delta = round((production_today - production_daily_mean) / production_daily_mean * 100)
 
     current_power = round(input_current*input_voltage)
     previous_mean_power = (df_today.tail(20)['18'].map(lambda x: round(x/10, 1)) * df_today.tail(20)['15'].map(lambda x: round(x/10, 1))).mean()
@@ -257,7 +257,7 @@ while True:
         kpi5.metric(
             label="Production today",
             value=f'{round(production_today/1000, 1)} kWh',
-            delta=f'{production_today_delta} %'
+            #delta=f'{production_today_delta} %'
         )
     continue
 
