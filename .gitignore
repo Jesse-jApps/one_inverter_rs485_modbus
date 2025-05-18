@@ -109,5 +109,6 @@ tmp/
 **/logs/
 
 data/
+data_meter/
 
 process_id.txt

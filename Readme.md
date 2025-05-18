@@ -14,6 +14,20 @@ Set up on a Raspberry Pi, this configuration enables easy access to the inverter
 
 To connect from the RJ45 to the Raspberry Pi, I used an old ethernet cabe, cut off one end and attached the 2 wires at Pin 1 and 2 to a serial-to-usb-adapter. I used this **URL to USB-Adapter** Adpater which can be ordered at only xxxPHP plus shipping.
 
+
+## Deployment:
+
+* adjust inverter.service and meter.service
+* move them to: `/etc/systemd/system/`
+
+```
+sudo systemctl daemon-reload
+sudo systemctl enable inverter.service
+sudo systemctl enable meter.service
+sudo systemctl start inverter.service
+sudo systemctl start meter.service
+```
+
 ![Schematics of the RJ45-Port](img/schematics.jpg)
 
 ![Serial to USB Adapter](img/adapter.jpg)

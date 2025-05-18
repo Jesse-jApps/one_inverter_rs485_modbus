@@ -1,0 +1,13 @@
+[Unit]
+Description=Meter RS485 Modbus Reader
+After=network.target
+
+[Service]
+User=jesse
+WorkingDirectory=/home/jesse/one_inverter_rs485_modbus
+ExecStart=/home/jesse/one_inverter_rs485_modbus/venv/bin/python /home/jesse/one_inverter_rs485_modbus/run_meter.py
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
