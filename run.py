@@ -7,10 +7,11 @@ import pandas as pd
 import minimalmodbus
 
 
-SERIAL_PORT = '/dev/ttyUSB0'
+SERIAL_PORT = os.environ.get('SERIAL_PORT', '/dev/ttyUSB0')
 
 BASE_FOLDERPATH = os.path.dirname(os.path.abspath(__file__))
 DATA_FOLDERPATH = os.path.join(BASE_FOLDERPATH, 'data')
+os.makedirs(DATA_FOLDERPATH, exist_ok=True)
 
 # Function to read input registers
 def read_input_registers(instrument, start_address, count):
