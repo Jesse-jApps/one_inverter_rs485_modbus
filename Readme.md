@@ -17,6 +17,12 @@ communication port and the Raspberry Pi. See the photos below and confirm the
 pinout against the manufacturer documentation for your exact model.
 
 
+## Runtime and license
+
+CI tests Python 3.12 and 3.14. Reader dependencies and optional dashboard
+dependencies are listed separately. Source code authored by Jesse Hinrichsen is
+MIT licensed; third-party dependencies retain their existing licenses.
+
 ## Deployment:
 
 Create a Python environment and install the reader dependencies:
@@ -52,8 +58,9 @@ venv/bin/python -m pip install -r requirements-dashboard.txt
 venv/bin/streamlit run dashboard/app.py
 ```
 
-Start the inverter reader and let it record a sample before opening the dashboard.
-The dashboard currently expects today's CSV file to exist. Register meanings,
+The dashboard waits for a complete sample if today's CSV is missing or empty,
+ignores incomplete rows, and marks samples older than 15 seconds as stale.
+Register meanings,
 scaling, and wiring must be checked against the exact inverter model and its
 manufacturer documentation; this repository does not establish compatibility
 with other models.
@@ -77,7 +84,8 @@ venv/bin/python -m unittest discover -s tests -v
 
 The tests use simulated serial responses and dashboard UI calls. They check
 fresh-start logging, CSV compatibility, serial-port configuration, recovery
-after a timeout, and the dashboard refresh delay. They do not require hardware
+after a timeout, missing/incomplete samples, stale/future timestamps, and the
+dashboard refresh delay. They do not require hardware
 or verify register meanings.
 
 ![Schematics of the RJ45-Port](img/schematics.jpg)

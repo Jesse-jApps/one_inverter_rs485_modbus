@@ -67,17 +67,22 @@ class ReaderStartupTests(unittest.TestCase):
             with self.subTest(reader=reader[0]):
                 self.check_reader(*reader, retry=True)
 
-    def test_dashboard_waits_between_refreshes(self):
+    def run_dashboard(self, contents="sample", sample_age=0):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "dashboard").mkdir()
             (root / "data").mkdir()
             script = root / "dashboard" / "app.py"
             shutil.copyfile(ROOT / "dashboard" / "app.py", script)
-            with (root / "data" / f"results_{datetime.now().date()}.csv").open("w", newline="") as handle:
-                writer = csv.writer(handle)
-                writer.writerow(range(28))
-                writer.writerow(list(range(27)) + [datetime.now().timestamp()])
+            if contents is not None:
+                filepath = root / "data" / f"results_{datetime.now().date()}.csv"
+                if contents == "sample":
+                    with filepath.open("w", newline="") as handle:
+                        writer = csv.writer(handle)
+                        writer.writerow(range(28))
+                        writer.writerow(list(range(27)) + [datetime.now().timestamp() - sample_age])
+                else:
+                    filepath.write_text(contents)
             streamlit = MagicMock()
             streamlit.columns.return_value = [MagicMock() for _ in range(5)]
             modules = {name: MagicMock() for name in ("altair", "pytz", "scipy", "scipy.signal")}
@@ -86,7 +91,28 @@ class ReaderStartupTests(unittest.TestCase):
                 with self.assertRaises(StopPolling):
                     runpy.run_path(str(script), run_name="__main__")
             sleep.assert_called_once_with(2)
-            streamlit.columns.assert_called_once_with(5)
+            return streamlit
+
+    def test_dashboard_waits_between_refreshes(self):
+        streamlit = self.run_dashboard()
+        streamlit.columns.assert_called_once_with(5)
+
+    def test_dashboard_waits_for_missing_empty_or_incomplete_data(self):
+        for contents in (None, "", "0,1\n1,2\n", ",".join(str(i) for i in range(28)) + "\n0,1\n"):
+            with self.subTest(contents=contents):
+                streamlit = self.run_dashboard(contents=contents)
+                streamlit.info.assert_called_once()
+                streamlit.columns.assert_not_called()
+
+    def test_dashboard_marks_old_samples_as_stale(self):
+        streamlit = self.run_dashboard(sample_age=60)
+        streamlit.warning.assert_called_once()
+        self.assertIn("stale", streamlit.warning.call_args.args[0])
+
+    def test_dashboard_marks_future_samples(self):
+        streamlit = self.run_dashboard(sample_age=-120)
+        streamlit.warning.assert_called_once()
+        self.assertIn("future", streamlit.warning.call_args.args[0])
 
 
 if __name__ == "__main__":

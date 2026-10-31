@@ -46,6 +46,20 @@ def prepare_df(df):
 
     return df
 
+
+def read_live_data(filepath):
+    try:
+        df = pd.read_csv(filepath, on_bad_lines='skip')
+    except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError):
+        return None
+    required = ['4', '6', '7', '9', '15', '18', '24', '27']
+    if not set(required).issubset(df.columns):
+        return None
+    df[required] = df[required].apply(pd.to_numeric, errors='coerce').replace(
+        [float('inf'), float('-inf')], float('nan')
+    )
+    return df.dropna(subset=required).copy()
+
 def prepare_df_minute(df):
     df_minute = df.groupby(['date', 'time'], as_index=False).mean(numeric_only=True)
     df_minute['datetime'] = df_minute.apply(
@@ -196,7 +210,12 @@ daily_refresh = 0
 while True:
     today_filepath = os.path.join(DATA_FOLDERPATH, f'results_{datetime.now().date()}.csv')
 
-    df_today = pd.read_csv(today_filepath)
+    df_today = read_live_data(today_filepath)
+    if df_today is None or df_today.empty:
+        with placeholder.container():
+            st.info("Waiting for a complete inverter sample in today's CSV file.")
+        time.sleep(2)
+        continue
     df_today['filepath'] = today_filepath
 
     #if daily_refresh == 10:
@@ -229,6 +248,11 @@ while True:
         current_power_delta = 0
 
     with placeholder.container():
+        sample_age = time.time() - df_today['27'].iloc[-1]
+        if sample_age > 15:
+            st.warning(f"Inverter data is stale: the latest sample is {round(sample_age)} seconds old.")
+        elif sample_age < -60:
+            st.warning("The latest sample is dated in the future. Check the reader and dashboard clocks.")
         kpi1, kpi2, kpi3, kpi4, kpi5 = st.columns(5)
 
         kpi1.metric(
