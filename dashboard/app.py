@@ -259,8 +259,6 @@ while True:
             value=f'{round(production_today/1000, 1)} kWh',
             #delta=f'{production_today_delta} %'
         )
-    continue
-
     time.sleep(2)
     daily_refresh += 1
 
